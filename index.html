@@ -134,6 +134,8 @@
     .bg-video.ready {
       opacity: 1;
     }
+    /* Mobile scrub video hidden by default */
+    .mobile-bg-video { opacity: 0 !important; }
 /* ── Loading screen title ── */
 .ls-title {
   font-family: 'Cinzel', serif;
@@ -1626,6 +1628,16 @@
        MOBILE LANDSCAPE
     ══════════════════════════════════════════════════════ */
     @media (max-height: 500px) and (orientation: landscape) {
+      /* === Mobile landscape: swap to mobile scrub video === */
+      .bg-video:not(.mobile-bg-video) {
+        opacity: 0 !important;
+      }
+      .mobile-bg-video {
+        opacity: 1 !important;
+      }
+      .mobile-bg-video.ready {
+        opacity: 1 !important;
+      }
       .ui-toggle-btn {
         display: block;
       }
@@ -1749,21 +1761,33 @@
         display: none !important;
       }
 
+      /* === Mobile landscape: compact top-left play/pause button === */
       .mob-autoplay-btn {
         display: flex !important;
-        bottom: 56px !important;
-        height: 36px !important;
-        padding: 0 14px !important;
-        font-size: 9px !important;
-        gap: 7px !important;
+        position: fixed !important;
+        top: 10px !important;
+        left: 10px !important;
+        bottom: auto !important;
+        transform: none !important;
+        width: 38px !important;
+        height: 38px !important;
+        padding: 0 !important;
+        border-radius: 50% !important;
+        gap: 0 !important;
+        font-size: 0 !important;
+      }
+      .mob-autoplay-btn .mab-label,
+      .mob-autoplay-btn .mab-label-play,
+      .mob-autoplay-btn .mab-label-pause {
+        display: none !important;
       }
       .mob-autoplay-btn .mab-icon-wrap {
-        width: 20px !important;
-        height: 20px !important;
+        width: 24px !important;
+        height: 24px !important;
       }
       .mob-autoplay-btn .mab-icon {
-        width: 9px !important;
-        height: 9px !important;
+        width: 11px !important;
+        height: 11px !important;
       }
 
       .day-night-btn {
@@ -3001,6 +3025,49 @@
 @keyframes dotBounce {
   0%,80%,100% { transform: scale(0.6); opacity: 0.4; }
   40%          { transform: scale(1);   opacity: 1; }
+}
+</style>
+<style>
+/* ===================================================
+   MOBILE LANDSCAPE FINAL OVERRIDES (cascade winner)
+   =================================================== */
+
+/* Mobile scrub video: hidden by default everywhere */
+.mobile-bg-video { opacity: 0 !important; }
+
+@media (max-height: 500px) and (orientation: landscape) {
+  /* Swap: hide desktop video, show mobile video */
+  #bgVideo    { opacity: 0 !important; }
+  #mobileVideo { opacity: 1 !important; pointer-events: none; }
+
+  /* Play/pause button: top-left compact circle */
+  .mob-autoplay-btn {
+    position: fixed !important;
+    top: 12px !important;
+    left: 12px !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    gap: 0 !important;
+  }
+  /* Hide text labels */
+  .mob-autoplay-btn .mab-label,
+  .mob-autoplay-btn .mab-label-play,
+  .mob-autoplay-btn .mab-label-pause {
+    display: none !important;
+  }
+  .mob-autoplay-btn .mab-icon-wrap {
+    width: 26px !important;
+    height: 26px !important;
+  }
+  .mob-autoplay-btn .mab-icon {
+    width: 12px !important;
+    height: 12px !important;
+  }
 }
 </style>
 </head>
@@ -5572,6 +5639,17 @@
   webkit-playsinline>
 </video>
 
+<video
+  id="mobileVideo"
+  class="bg-video mobile-bg-video"
+  src="mobile-scrub.mp4"
+  preload="auto"
+  playsinline
+  muted
+  loop
+  webkit-playsinline>
+</video>
+
   <div class="video-status" id="videoStatus">
     <span id="statusText">Loading frames…</span>
     <span class="progress-bar"><span class="progress-fill" id="progressFill"></span></span>
@@ -7700,32 +7778,68 @@
       var mobAutoplayBtn = document.getElementById('mobAutoplayBtn');
       if (!mobAutoplayBtn) return;
 
-      // Show only on mobile
-      var isMob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 768;
+      // Show only on mobile (portrait or landscape)
+      var isMob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 1024;
       if (!isMob) return;
       mobAutoplayBtn.style.display = 'flex';
 
+      var mobileVideo = document.getElementById('mobileVideo');
+      // Preload mobile video so it's ready when landscape kicks in
+      if (mobileVideo) { mobileVideo.load(); }
+
+      function isLandscape() {
+        return window.innerHeight <= 500 && window.innerWidth > window.innerHeight;
+      }
+
+      function activeVideo() {
+        return (isLandscape() && mobileVideo) ? mobileVideo : bgVideo;
+      }
+
       function updateBtnLabel() {
-        if (bgVideo.paused) {
+        var vid = activeVideo();
+        if (vid.paused) {
           mobAutoplayBtn.classList.remove('playing');
         } else {
           mobAutoplayBtn.classList.add('playing');
         }
       }
 
-      bgVideo.addEventListener('play',  updateBtnLabel);
-      bgVideo.addEventListener('pause', updateBtnLabel);
-      bgVideo.addEventListener('ended', function() {
-        bgVideo.currentTime = 0;
-        updateBtnLabel();
+      // Sync button with whichever video is active
+      [bgVideo, mobileVideo].filter(Boolean).forEach(function(v) {
+        v.addEventListener('play',  updateBtnLabel);
+        v.addEventListener('pause', updateBtnLabel);
+        v.addEventListener('ended', function() {
+          if (v === bgVideo) { bgVideo.currentTime = 0; }
+          updateBtnLabel();
+        });
       });
+
+      // On orientation change, start/stop the correct video
+      function handleOrientationChange() {
+        if (isLandscape() && mobileVideo) {
+          // Switch to mobile video
+          bgVideo.pause();
+          if (mobileVideo.readyState < 1) mobileVideo.load();
+          mobileVideo.classList.add('ready');
+          mobileVideo.play().catch(function() {});
+        } else {
+          // Switch back to desktop video
+          if (mobileVideo && !mobileVideo.paused) mobileVideo.pause();
+          bgVideo.play().catch(function() {});
+        }
+        updateBtnLabel();
+      }
+      window.addEventListener('resize', handleOrientationChange);
+      if (screen.orientation) screen.orientation.addEventListener('change', handleOrientationChange);
+      handleOrientationChange(); // run once on load
 
       mobAutoplayBtn.addEventListener('click', function(e) {
         e.stopPropagation();
-        if (bgVideo.paused) {
-          bgVideo.play().catch(function() {});
+        var vid = activeVideo();
+        if (vid.paused) {
+          vid.play().catch(function() {});
         } else {
-          bgVideo.pause();
+          vid.pause();
         }
       });
 
