@@ -3169,7 +3169,7 @@
   <!-- ══════════════════════════════════════════════════════
        CLICK TO EXPLORE OVERLAY
        ══════════════════════════════════════════════════════ -->
-  <div id="exploreOverlay" class="visible">
+  <div id="exploreOverlay">
     <div class="explore-ring"></div>
     <div class="explore-ring"></div>
     <div class="explore-ring"></div>
@@ -7864,7 +7864,7 @@ if (isMobileEngine) {
   let returnState = null;
   try { const raw = sessionStorage.getItem('yoganadReturnState'); if (raw) { returnState = JSON.parse(raw); if (!returnState.ts || Date.now()-returnState.ts > 7200000) returnState=null; sessionStorage.removeItem('yoganadReturnState'); } } catch(e) { returnState=null; }
 
-  // ── helpers ──
+  // \u2500\u2500 helpers \u2500\u2500
   function removeLoadingScreen() {
     if (loadingScreen) { loadingScreen.classList.remove('ls-visible'); loadingScreen.classList.add('fade-out'); setTimeout(function(){ if(loadingScreen.parentNode) loadingScreen.parentNode.removeChild(loadingScreen); },700); }
   }
@@ -7873,7 +7873,6 @@ if (isMobileEngine) {
     introVideo.classList.add('fade-out');
     setTimeout(function(){ if(introVideo&&introVideo.parentNode) introVideo.parentNode.removeChild(introVideo); },1100);
     setTimeout(function(){ document.body.classList.remove('intro-revealing'); startDragHintTimer(); },2600);
-    // Auto-play bg video when intro ends
     if (bgVideo && bgVideo.paused) { bgVideo.currentTime = 0; bgVideo.play().catch(function(){}); }
   }
   function onVideoEnded() {
@@ -7882,13 +7881,13 @@ if (isMobileEngine) {
     (function wait(){ if(typeof ready!=='undefined'&&ready){ doReveal(); } else { setTimeout(wait,80); } })();
   }
 
-  // ── background video loading (mobile path) ──
+  // \u2500\u2500 background video loading (mobile path) \u2500\u2500
   function startFrameLoading() {
     if (framesStarted) return; framesStarted = true;
-    startBgVideo(); // delegates to the unified video loader
+    startBgVideo();
   }
 
-  // ── skip (back-navigation / pageshow) ──
+  // \u2500\u2500 skip (back-navigation / pageshow) \u2500\u2500
   function skipIntroImmediately() {
     if (introFinished) return; introFinished = true;
     if (exploreOverlay && exploreOverlay.parentNode) exploreOverlay.parentNode.removeChild(exploreOverlay);
@@ -7899,7 +7898,7 @@ if (isMobileEngine) {
     (function wf(){ if(typeof ready!=='undefined'&&ready){ startDragHintTimer(); } else { setTimeout(wf,80); } })();
   }
 
-  // ── return state: skip straight in ──
+  // \u2500\u2500 return state: skip straight in \u2500\u2500
   if (returnState && (returnState.marker || returnState.subPill)) {
     skipIntroImmediately();
     function restoreState(){ if(!ready){setTimeout(restoreState,100);return;} slider.value=parseFloat(slider.max); refreshSliderVisual(); targetFloat=sliderToFrameFloat(); displayedFloat=targetFloat; activeMarker=returnState.marker||null; if(activeMarker==='amenities'){amenitiesBar.classList.add('visible');plotBar.classList.remove('visible');}else if(activeMarker==='plots'){plotBar.classList.add('visible');amenitiesBar.classList.remove('visible');} if(returnState.subPill&&returnState.subPillType){activeSubPill=returnState.subPill;activeSubPillType=returnState.subPillType;if(returnState.subPillType==='category'){activeCategoryKey=returnState.category||returnState.subPill;activeCategoryLink=SECTION_LINKS[activeCategoryKey]||null;plotBar.classList.remove('visible');amenitiesBar.classList.remove('visible');}else if(returnState.subPillType==='plotsearch'){activePlotNumber=returnState.plotNumber||null;activeDirection=null;plotBar.classList.remove('visible');amenitiesBar.classList.remove('visible');}else if(returnState.subPillType==='direction'){activeDirection=returnState.direction||null;activePlotNumber=null;plotBar.classList.remove('visible');amenitiesBar.classList.remove('visible');}else if(returnState.subPillType==='amenity'){const pill=document.querySelector('.plot-pill[data-amenity="'+returnState.subPill+'"]');if(pill)pill.classList.add('active');} checkAndShowSvg();} updateSectionDisplay();}
@@ -7907,11 +7906,38 @@ if (isMobileEngine) {
   }
   window.addEventListener('pageshow', function(e){ if(e.persisted) skipIntroImmediately(); });
 
-  // ── Explore button click → start music + loading → then intro video ──
-  window._lsBarFill = document.querySelector('.ls-bar-fill');
+  // \u2500\u2500 Explore button click \u2192 start music + loading \u2192 then intro video \u2500\u2500
+  window._lsBarFill = document.getElementById('ls-bar-fill-el');
+
+  function attachExploreClick() {
+    if (!exploreBtn) return;
+    exploreBtn.addEventListener('click', function onExploreClick() {
+      if (exploreClicked) return;
+      exploreClicked = true;
+      // Fade out explore overlay, keep in DOM (so we can re-show on next rotation)
+      if (exploreOverlay) {
+        exploreOverlay.classList.remove('visible');
+        exploreOverlay.classList.add('fade-out');
+        setTimeout(function(){ exploreOverlay.classList.remove('fade-out'); }, 700);
+      }
+      startLoadingThenVideo();
+    }, { once: true });
+  }
+
+  // \u2500\u2500 Called by rotate overlay when phone goes to landscape \u2500\u2500
+  window._showExplore = function() {
+    if (introFinished) return; // past the intro, nothing to show
+    exploreClicked = false;
+    if (exploreOverlay) {
+      exploreOverlay.classList.remove('fade-out');
+      void exploreOverlay.offsetWidth; // force reflow
+      exploreOverlay.classList.add('visible');
+    }
+    attachExploreClick();
+  };
 
   function startLoadingThenVideo() {
-    // Show loading screen
+    if (!loadingScreen) return;
     loadingScreen.classList.add('ls-visible');
     window._lsStartTime = Date.now();
 
@@ -7919,8 +7945,11 @@ if (isMobileEngine) {
     var bgMus = document.getElementById('bgMusic');
     if (bgMus) { bgMus.play().catch(function(){}); var mb = document.getElementById('musicBtn'); if(mb) mb.classList.add('playing'); }
 
-    // Start loading bgMobileVideo in parallel (for after intro)
+    // Start loading bgMobileVideo in parallel
     startFrameLoading();
+
+    // Reset bar
+    if (window._lsBarFill) { window._lsBarFill.style.transition='none'; window._lsBarFill.style.width='0%'; }
 
     // Track intro video buffer on bar
     introVideo.addEventListener('progress', function() {
@@ -7932,7 +7961,6 @@ if (isMobileEngine) {
       }
     });
 
-    // Wait for video ready, then wait out 5s loading min, then play
     var videoReady = false;
     var _vFallback = setTimeout(function(){ videoReady = true; tryPlay(); }, 8000);
 
@@ -7944,7 +7972,7 @@ if (isMobileEngine) {
     });
 
     function tryPlay() {
-      if (window._lsBarFill) window._lsBarFill.style.width = '100%';
+      if (window._lsBarFill) { window._lsBarFill.style.transition='width 0.4s ease'; window._lsBarFill.style.width = '100%'; }
       var elapsed = Date.now() - (window._lsStartTime || Date.now());
       var remain  = Math.max(0, 5000 - elapsed);
       setTimeout(function() {
@@ -7962,15 +7990,8 @@ if (isMobileEngine) {
     introVideo.load();
   }
 
-  if (exploreBtn) {
-    exploreBtn.addEventListener('click', function onExploreClick() {
-      if (exploreClicked) return; exploreClicked = true;
-      exploreBtn.removeEventListener('click', onExploreClick);
-      // Fade out explore overlay
-      if (exploreOverlay) { exploreOverlay.classList.remove('visible'); exploreOverlay.classList.add('fade-out'); setTimeout(function(){ if(exploreOverlay.parentNode) exploreOverlay.parentNode.removeChild(exploreOverlay); }, 700); }
-      startLoadingThenVideo();
-    }, { once: true });
-  }
+  // NOTE: exploreOverlay starts hidden. window._showExplore() is called
+  // by the rotate overlay when the phone goes to landscape.
 })();
 } else {
 // ── DESKTOP PATH ─────────────────────────────────────────────────────────────
@@ -8081,6 +8102,9 @@ if (isMobileEngine) {
     introVideo.addEventListener('error', function(){ console.warn('Intro video error'); if(window._lsBarFill) window._lsBarFill.style.width='100%'; removeLoadingScreen(); onVideoEnded(); });
     introVideo.load();
   }
+
+  // Desktop: show explore overlay immediately
+  if (exploreOverlay) { void exploreOverlay.offsetWidth; exploreOverlay.classList.add('visible'); }
 
   if (exploreBtn) {
     exploreBtn.addEventListener('click', function onExploreClick() {
@@ -8553,14 +8577,13 @@ if (bgMusic) bgMusic.volume = 0.2;
         overlayActive = false;
       }, 500);
 
-      // First time: full loading shimmer
-      if (!siteStarted) {
-        siteStarted = true;
-        showTransitionShimmer();
-      } else {
-        // Returning from portrait: brief dark flash
-        buildShimmer(700);
-      }
+      // Show explore button so user can start the experience
+      // After intro is done, _showExplore is a no-op (introFinished guard)
+      setTimeout(function() {
+        if (typeof window._showExplore === 'function') {
+          window._showExplore();
+        }
+      }, 350);
     }
 
     // Full shimmer (first rotation ever)
