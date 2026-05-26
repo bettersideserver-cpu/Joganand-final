@@ -134,8 +134,9 @@
     .bg-video.ready {
       opacity: 1;
     }
-    /* Mobile scrub video hidden by default */
+    /* Mobile scrub video hidden by default, shown via .ready class */
     .mobile-bg-video { opacity: 0 !important; }
+    .mobile-bg-video.ready { opacity: 1 !important; }
 /* ── Loading screen title ── */
 .ls-title {
   font-family: 'Cinzel', serif;
@@ -3037,8 +3038,11 @@
 
 @media (max-height: 500px) and (orientation: landscape) {
   /* Swap: hide desktop video, show mobile video */
-  #bgVideo    { opacity: 0 !important; }
-  #mobileVideo { opacity: 1 !important; pointer-events: none; }
+  /* Desktop video always hidden on mobile (src stripped by JS) */
+  #bgVideo { opacity: 0 !important; }
+  /* Mobile video visible when .ready class is added by JS */
+  #mobileVideo.ready { opacity: 1 !important; }
+  #mobileVideo { pointer-events: none; }
 
   /* Play/pause button: top-left compact circle */
   .mob-autoplay-btn {
@@ -5646,7 +5650,7 @@
   preload="auto"
   playsinline
   muted
-  loop
+
   webkit-playsinline>
 </video>
 
@@ -6013,8 +6017,16 @@
     const isMobileEngine = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 1024;
 
   // Single bg video element used by both desktop and mobile
-    const bgVideo = document.getElementById('bgVideo');
+    // On mobile: bgVideo points to mobileVideo so all scrub/seek/play logic works unchanged
+    let bgVideo = isMobileEngine
+      ? document.getElementById('mobileVideo')
+      : document.getElementById('bgVideo');
     const bgMobileVideo = bgVideo; // alias kept for any legacy refs
+    // On mobile: remove src from desktop video so it never loads
+    if (isMobileEngine) {
+      var _deskVid = document.getElementById('bgVideo');
+      if (_deskVid) { _deskVid.removeAttribute('src'); _deskVid.load(); }
+    }
 
     const statusEl = document.getElementById('videoStatus');
     const statusText = document.getElementById('statusText');
@@ -7779,67 +7791,32 @@
       if (!mobAutoplayBtn) return;
 
       // Show only on mobile (portrait or landscape)
+      // On mobile, bgVideo already points to mobileVideo (redirected above)
       var isMob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 1024;
       if (!isMob) return;
       mobAutoplayBtn.style.display = 'flex';
 
-      var mobileVideo = document.getElementById('mobileVideo');
-      // Preload mobile video so it's ready when landscape kicks in
-      if (mobileVideo) { mobileVideo.load(); }
-
-      function isLandscape() {
-        return window.innerHeight <= 500 && window.innerWidth > window.innerHeight;
-      }
-
-      function activeVideo() {
-        return (isLandscape() && mobileVideo) ? mobileVideo : bgVideo;
-      }
-
       function updateBtnLabel() {
-        var vid = activeVideo();
-        if (vid.paused) {
+        if (bgVideo.paused) {
           mobAutoplayBtn.classList.remove('playing');
         } else {
           mobAutoplayBtn.classList.add('playing');
         }
       }
 
-      // Sync button with whichever video is active
-      [bgVideo, mobileVideo].filter(Boolean).forEach(function(v) {
-        v.addEventListener('play',  updateBtnLabel);
-        v.addEventListener('pause', updateBtnLabel);
-        v.addEventListener('ended', function() {
-          if (v === bgVideo) { bgVideo.currentTime = 0; }
-          updateBtnLabel();
-        });
-      });
-
-      // On orientation change, start/stop the correct video
-      function handleOrientationChange() {
-        if (isLandscape() && mobileVideo) {
-          // Switch to mobile video
-          bgVideo.pause();
-          if (mobileVideo.readyState < 1) mobileVideo.load();
-          mobileVideo.classList.add('ready');
-          mobileVideo.play().catch(function() {});
-        } else {
-          // Switch back to desktop video
-          if (mobileVideo && !mobileVideo.paused) mobileVideo.pause();
-          bgVideo.play().catch(function() {});
-        }
+      bgVideo.addEventListener('play',  updateBtnLabel);
+      bgVideo.addEventListener('pause', updateBtnLabel);
+      bgVideo.addEventListener('ended', function() {
+        bgVideo.currentTime = 0;
         updateBtnLabel();
-      }
-      window.addEventListener('resize', handleOrientationChange);
-      if (screen.orientation) screen.orientation.addEventListener('change', handleOrientationChange);
-      handleOrientationChange(); // run once on load
+      });
 
       mobAutoplayBtn.addEventListener('click', function(e) {
         e.stopPropagation();
-        var vid = activeVideo();
-        if (vid.paused) {
-          vid.play().catch(function() {});
+        if (bgVideo.paused) {
+          bgVideo.play().catch(function() {});
         } else {
-          vid.pause();
+          bgVideo.pause();
         }
       });
 
