@@ -2945,10 +2945,14 @@
   justify-content: center;
   gap: 28px;
   opacity: 0;
-  transition: opacity 0.5s ease;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+  overflow: hidden;
+  touch-action: none;
 }
 #rotateOverlay.active {
   display: flex;
+  pointer-events: all;
 }
 #rotateOverlay.visible {
   opacity: 1;
@@ -2956,6 +2960,7 @@
 #rotateOverlay.fade-out {
   opacity: 0;
   pointer-events: none;
+  transition: opacity 0.4s ease;
 }
 
 /* Phone rotate icon */
@@ -8496,24 +8501,40 @@ if (bgMusic) bgMusic.volume = 0.2;
        ══════════════════════════════════════════════════════ -->
   <script>
   (function() {
-    var overlay  = document.getElementById('rotateOverlay');
+    var overlay = document.getElementById('rotateOverlay');
     if (!overlay) return;
 
+    // Mobile detection
     function isMobile() {
       return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
              ('ontouchstart' in window && window.innerWidth <= 1024);
     }
+
+    // Reliable portrait check — iOS Safari safe
+    // screen.orientation.angle: 0/180 = portrait, 90/270 = landscape
+    // window.orientation (legacy iOS): 0/180 = portrait
+    // fallback: innerHeight > innerWidth
     function isPortrait() {
+      if (screen.orientation && typeof screen.orientation.angle === 'number') {
+        var a = screen.orientation.angle;
+        return a === 0 || a === 180;
+      }
+      if (typeof window.orientation === 'number') {
+        return window.orientation === 0 || window.orientation === 180;
+      }
       return window.innerHeight > window.innerWidth;
     }
 
-    var overlayShown     = false;
-    var overlayDismissed = false;
+    var overlayActive = false;
+    var hideTimer     = null;
+    var siteStarted   = false;
 
-    // ── Show rotate overlay (portrait state) ──────────────
+    // Show overlay — blocks the whole site
     function showOverlay() {
-      if (overlayDismissed || overlayShown) return;
-      overlayShown = true;
+      if (overlayActive) return;
+      overlayActive = true;
+      clearTimeout(hideTimer);
+      overlay.classList.remove('fade-out');
       overlay.classList.add('active');
       requestAnimationFrame(function() {
         requestAnimationFrame(function() {
@@ -8522,32 +8543,36 @@ if (bgMusic) bgMusic.volume = 0.2;
       });
     }
 
-    // ── On rotation detected: show real loading screen, then hide overlay ──
-    function onRotatedToLandscape() {
-      if (!overlayShown) return;
-      overlayDismissed = true; // prevent re-trigger
-
-      // 1. Fade out rotate overlay immediately
+    // Hide overlay + boot/resume site
+    function hideOverlay() {
+      if (!overlayActive) return;
       overlay.classList.add('fade-out');
       overlay.classList.remove('visible');
-      setTimeout(function() {
+      hideTimer = setTimeout(function() {
         overlay.classList.remove('active', 'fade-out');
-        overlayShown = false;
+        overlayActive = false;
       }, 500);
 
-      // 2. Show the real loading screen briefly as "loading animation"
-      //    It may already be gone (if intro finished) — only show if it exists
+      // First time: full loading shimmer
+      if (!siteStarted) {
+        siteStarted = true;
+        showTransitionShimmer();
+      } else {
+        // Returning from portrait: brief dark flash
+        buildShimmer(700);
+      }
+    }
+
+    // Full shimmer (first rotation ever)
+    function showTransitionShimmer() {
       var ls = document.getElementById('loadingScreen');
-      if (ls && ls.parentNode) {
-        // Re-show it as a loading flash
+      if (ls) {
+        ls.style.display    = 'flex';
         ls.style.opacity    = '1';
         ls.style.transition = 'opacity 0.4s ease';
+        ls.style.zIndex     = '99998';
         ls.classList.remove('fade-out');
-        ls.style.display    = 'flex';
-        ls.style.zIndex     = '99998'; // just below rotate overlay
-
-        // Animate progress bar from 0→100 over 1.8s
-        var fill = ls.querySelector('.ls-bar-fill') || ls.querySelector('[class*="bar-fill"]');
+        var fill = ls.querySelector('.ls-bar-fill');
         if (fill) {
           fill.style.transition = 'none';
           fill.style.width = '0%';
@@ -8556,78 +8581,79 @@ if (bgMusic) bgMusic.volume = 0.2;
             fill.style.width = '100%';
           }, 50);
         }
-
-        // Fade out loading screen after 2s
         setTimeout(function() {
           ls.style.opacity = '0';
-          setTimeout(function() {
-            ls.style.display = 'none';
-          }, 500);
-        }, 2000);
-
+          setTimeout(function() { ls.style.display = 'none'; }, 500);
+        }, 2200);
       } else {
-        // Loading screen already gone — create a minimal shimmer overlay instead
-        var shimmer = document.createElement('div');
-        shimmer.style.cssText = [
-          'position:fixed','inset:0','z-index:99998',
-          'background:#070604',
-          'display:flex','flex-direction:column',
-          'align-items:center','justify-content:center','gap:20px',
-          'opacity:1','transition:opacity 0.5s ease'
-        ].join(';');
-
-        // Gold bar
-        var barWrap = document.createElement('div');
-        barWrap.style.cssText = 'width:200px;height:2px;background:rgba(200,175,120,0.15);border-radius:2px;overflow:hidden';
-        var bar = document.createElement('div');
-        bar.style.cssText = 'height:100%;width:0%;background:linear-gradient(90deg,transparent,rgba(200,175,120,0.9),transparent);border-radius:2px;transition:width 1.8s cubic-bezier(0.4,0,0.2,1)';
-        barWrap.appendChild(bar);
-
-        // Label
-        var lbl = document.createElement('div');
-        lbl.textContent = 'LOADING';
-        lbl.style.cssText = 'font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:0.4em;color:rgba(200,175,120,0.6)';
-
-        shimmer.appendChild(lbl);
-        shimmer.appendChild(barWrap);
-        document.body.appendChild(shimmer);
-
-        setTimeout(function() { bar.style.width = '100%'; }, 60);
-        setTimeout(function() {
-          shimmer.style.opacity = '0';
-          setTimeout(function() { if (shimmer.parentNode) shimmer.parentNode.removeChild(shimmer); }, 500);
-        }, 2000);
+        buildShimmer(2000);
       }
     }
 
+    // Generic shimmer overlay
+    function buildShimmer(duration) {
+      var s = document.createElement('div');
+      s.style.cssText = 'position:fixed;inset:0;z-index:99998;background:#070604;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;opacity:1;transition:opacity 0.45s ease;pointer-events:none';
+      var bw = document.createElement('div');
+      bw.style.cssText = 'width:180px;height:1px;background:rgba(200,175,120,0.12);border-radius:1px;overflow:hidden';
+      var b = document.createElement('div');
+      var barSecs = (duration * 0.85 / 1000).toFixed(2);
+      b.style.cssText = 'height:100%;width:0%;background:linear-gradient(90deg,transparent,rgba(200,175,120,0.9),transparent);transition:width ' + barSecs + 's cubic-bezier(0.4,0,0.2,1)';
+      bw.appendChild(b);
+      var lbl = document.createElement('div');
+      lbl.textContent = 'YOGANAD ESTATE';
+      lbl.style.cssText = 'font-family:Montserrat,sans-serif;font-size:9px;letter-spacing:0.45em;color:rgba(200,175,120,0.5);text-transform:uppercase';
+      s.appendChild(lbl);
+      s.appendChild(bw);
+      document.body.appendChild(s);
+      setTimeout(function() { b.style.width = '100%'; }, 40);
+      setTimeout(function() {
+        s.style.opacity = '0';
+        setTimeout(function() { if (s.parentNode) s.parentNode.removeChild(s); }, 500);
+      }, duration);
+    }
+
+    // Orientation check
     function checkOrientation() {
       if (!isMobile()) return;
-      if (overlayDismissed) return;
-
       if (isPortrait()) {
         showOverlay();
-      } else if (overlayShown) {
-        onRotatedToLandscape();
+      } else {
+        hideOverlay();
       }
     }
 
-    window.addEventListener('orientationchange', function() {
-      setTimeout(checkOrientation, 150);
-    });
+    // orientationchange fires before dimensions update on iOS.
+    // Fire check at 100ms, 300ms and 600ms to catch slow reflows on all iPhones.
+    function onOrientationChange() {
+      setTimeout(checkOrientation, 100);
+      setTimeout(checkOrientation, 300);
+      setTimeout(checkOrientation, 600);
+    }
+
+    window.addEventListener('orientationchange', onOrientationChange);
+
+    // screen.orientation API (modern Chrome/Safari)
+    if (screen.orientation && screen.orientation.addEventListener) {
+      screen.orientation.addEventListener('change', onOrientationChange);
+    }
+
+    // resize fallback (Android WebView, desktop testing)
     window.addEventListener('resize', function() {
-      if (!isMobile() || overlayDismissed) return;
-      clearTimeout(window._rotCheckTimer);
-      window._rotCheckTimer = setTimeout(checkOrientation, 120);
+      if (!isMobile()) return;
+      clearTimeout(window._rotResizeTimer);
+      window._rotResizeTimer = setTimeout(checkOrientation, 150);
     });
 
-    // Initial check
-    if (isMobile() && isPortrait()) {
-      setTimeout(showOverlay, 300);
+    // Initial check — slight delay so layout is stable
+    if (isMobile()) {
+      setTimeout(checkOrientation, 200);
     }
   })();
 
 
   </script>
 </body>
+
 
 </html>
