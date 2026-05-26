@@ -7588,34 +7588,37 @@
       targetFloat = endVal;
       displayedFloat = endVal;
 
-      // Seek video to last frame
+      // Seek video to last frame (mobile-safe)
       if (bgVideo) {
-        bgVideo.pause();
         _pendingScrub = false;
         _scrubWasPlaying = false;
+        window._bgVideoPinnedAtEnd = true; // prevent ended handler from resetting to 0
+
         var doSeekToEnd = function() {
-          if (bgVideo.duration && !isNaN(bgVideo.duration) && bgVideo.duration > 0) {
-            bgVideo.currentTime = bgVideo.duration - 0.001;
+          if (!bgVideo.duration || isNaN(bgVideo.duration) || bgVideo.duration <= 0) return;
+          var targetTime = bgVideo.duration - 0.001;
+          // On mobile, seek while playing then pause on seeked for reliability
+          bgVideo.addEventListener('seeked', function _onSeeked() {
+            bgVideo.removeEventListener('seeked', _onSeeked);
+            bgVideo.pause();
+          }, { once: true });
+          bgVideo.currentTime = targetTime;
+          // If paused, briefly play to allow seek to complete on mobile
+          if (bgVideo.paused) {
+            bgVideo.play().catch(function() {
+              // If play() blocked, just force the pause — seek still applied
+              bgVideo.pause();
+            });
           }
         };
-        // Try immediately, then retry via multiple events as fallback
-        if (bgVideo.readyState >= 2) {
+
+        if (bgVideo.readyState >= 1) {
           doSeekToEnd();
-        } else if (bgVideo.readyState >= 1) {
-          doSeekToEnd();
-          // also retry when data is ready
-          bgVideo.addEventListener('loadeddata', function _ld() {
-            bgVideo.removeEventListener('loadeddata', _ld);
+        } else {
+          bgVideo.addEventListener('loadedmetadata', function _onMeta() {
+            bgVideo.removeEventListener('loadedmetadata', _onMeta);
             doSeekToEnd();
           });
-        } else {
-          var _onMeta = function() {
-            bgVideo.removeEventListener('loadedmetadata', _onMeta);
-            bgVideo.removeEventListener('loadeddata', _onMeta);
-            doSeekToEnd();
-          };
-          bgVideo.addEventListener('loadedmetadata', _onMeta);
-          bgVideo.addEventListener('loadeddata', _onMeta);
         }
       }
 
@@ -7858,13 +7861,20 @@
       bgVideo.addEventListener('play',  updateBtnLabel);
       bgVideo.addEventListener('pause', updateBtnLabel);
       bgVideo.addEventListener('ended', function() {
-        bgVideo.currentTime = 0;
+        // Only reset to 0 if we're NOT intentionally pinned at the last frame
+        if (!window._bgVideoPinnedAtEnd) {
+          bgVideo.currentTime = 0;
+        } else {
+          // Pinned at end — stay there, just pause
+          bgVideo.pause();
+        }
         updateBtnLabel();
       });
 
       mobAutoplayBtn.addEventListener('click', function(e) {
         e.stopPropagation();
         if (bgVideo.paused) {
+          window._bgVideoPinnedAtEnd = false; // user wants to play from here
           bgVideo.play().catch(function() {});
         } else {
           bgVideo.pause();
