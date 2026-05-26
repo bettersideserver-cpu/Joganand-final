@@ -2736,15 +2736,18 @@
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 9px !important;
+        gap: 0 !important;
         position: fixed !important;
-        bottom: 80px !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
+        top: 12px !important;
+        left: 12px !important;
+        bottom: auto !important;
+        transform: none !important;
         z-index: 110 !important;
-        height: 44px !important;
-        padding: 0 20px !important;
-        border-radius: 50px !important;
+        width: 38px !important;
+        height: 38px !important;
+        padding: 0 !important;
+        border-radius: 50% !important;
+        font-size: 0 !important;
         /* dark glass base */
         background: linear-gradient(135deg, rgba(18,14,8,0.85) 0%, rgba(10,8,4,0.82) 100%) !important;
         border: 1px solid rgba(200,175,120,0.50) !important;
@@ -2752,14 +2755,13 @@
         box-shadow: 0 4px 24px rgba(0,0,0,0.60), inset 0 1px 0 rgba(200,175,120,0.14) !important;
         color: rgba(200,175,120,0.95) !important;
         font-family: inherit !important;
-        font-size: 10px !important;
         font-weight: 700 !important;
         letter-spacing: 0.14em !important;
         text-transform: uppercase !important;
         cursor: pointer !important;
         backdrop-filter: blur(22px) saturate(1.5) !important;
         -webkit-backdrop-filter: blur(22px) saturate(1.5) !important;
-        transition: border-color 0.25s, box-shadow 0.25s, bottom 0.35s cubic-bezier(0.4,0,0.2,1) !important;
+        transition: border-color 0.25s, box-shadow 0.25s !important;
         white-space: nowrap !important;
         outline: none !important;
         -webkit-tap-highlight-color: transparent !important;
@@ -2817,8 +2819,22 @@
       .mob-autoplay-btn.playing .mab-label-play { opacity: 0 !important; width: 0 !important; overflow: hidden !important; }
       .mob-autoplay-btn.playing .mab-pause { opacity: 1 !important; }
       .mob-autoplay-btn.playing .mab-label-pause { opacity: 1 !important; width: auto !important; }
+      /* portrait: hide labels, keep as compact circle top-left */
+      .mob-autoplay-btn .mab-label,
+      .mob-autoplay-btn .mab-label-play,
+      .mob-autoplay-btn .mab-label-pause { display: none !important; }
+      .mob-autoplay-btn .mab-icon-wrap {
+        width: 24px !important;
+        height: 24px !important;
+      }
+      .mob-autoplay-btn .mab-icon {
+        width: 11px !important;
+        height: 11px !important;
+      }
+      /* portrait: no longer shifts with controls open */
       body.mob-controls-open .mob-autoplay-btn {
-        bottom: 108px !important;
+        top: 12px !important;
+        bottom: auto !important;
       }
 
       input[type=range].env-range {
@@ -7002,6 +7018,7 @@
 
       var mobControlsOpen = false;
       var mobActiveMarker = null;
+      var _filterAutoHideTimer = null;
 
       var mobGardensBtn   = document.getElementById('mobGardensBtn');
       var mobPlotsBtn     = document.getElementById('mobPlotsBtn');
@@ -7013,16 +7030,22 @@
         document.body.classList.add('mob-controls-open');
         bottomNav.classList.remove('ui-hidden');
         if (searchContainer) searchContainer.classList.remove('ui-hidden');
+        // Auto-hide filter bar after 4 seconds of no interaction
+        clearTimeout(_filterAutoHideTimer);
+        _filterAutoHideTimer = setTimeout(function() {
+          if (searchContainer) searchContainer.classList.add('ui-hidden');
+        }, 4000);
       }
       function closeMobControls() {
         mobControlsOpen = false;
         document.body.classList.remove('mob-controls-open');
         closeMobSubPill();
-        // Hide bottom navbar + search in landscape
+        // Hide bottom navbar + search on close (both portrait and landscape)
         if (isMobLandscape()) {
           bottomNav.classList.add('ui-hidden');
-          if (searchContainer) searchContainer.classList.add('ui-hidden');
         }
+        if (isMobileAny() && searchContainer) searchContainer.classList.add('ui-hidden');
+        clearTimeout(_filterAutoHideTimer);
       }
       function closeMobSubPill() {
         mobActiveMarker = null;
@@ -7039,13 +7062,13 @@
         if (pBar) pBar.classList.remove('visible');
       }
 
-      // Init: hide navbar + search in landscape (hamburger controls it)
+      // Init: hide navbar + search (hamburger controls it on mobile)
       if (isMobLandscape()) {
         bottomNav.classList.add('ui-hidden');
-        if (searchContainer) searchContainer.classList.add('ui-hidden');
       }
+      if (isMobileAny() && searchContainer) searchContainer.classList.add('ui-hidden');
       window.addEventListener('resize', function() {
-        if (!isMobLandscape()) {
+        if (!isMobileAny()) {
           bottomNav.classList.remove('ui-hidden');
           if (searchContainer) searchContainer.classList.remove('ui-hidden');
         }
@@ -7099,14 +7122,18 @@
       forwardPillClicks(mobGardensPills, 'amenity');
       forwardPillClicks(mobPlotsPills,   'plot');
 
-      // Close sub-pill on outside tap
+      // Close sub-pill on outside tap; reset filter auto-hide on interaction with filter bar
       document.addEventListener('pointerdown', function(e) {
         if (!isMobileAny()) return;
         if (!e.target.closest('#mobMarkerBtns, #mobGardensPills, #mobPlotsPills')) {
           closeMobSubPill();
         }
-        if (!e.target.closest('#uiToggleBtn, .env-bar, #mobMarkerBtns, #mobGardensPills, #mobPlotsPills')) {
-          // keep controls state — don't auto close controls on tap
+        // If user taps inside filter/search area, reset the auto-hide timer
+        if (e.target.closest('.search-container, #directionBar, .dir-btn, .search-bar-wrap')) {
+          clearTimeout(_filterAutoHideTimer);
+          _filterAutoHideTimer = setTimeout(function() {
+            if (searchContainer) searchContainer.classList.add('ui-hidden');
+          }, 4000);
         }
       });
 
