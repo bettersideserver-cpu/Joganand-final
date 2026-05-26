@@ -1543,6 +1543,85 @@
     .vid-play-btn.paused .vp-play  { opacity: 1; }
     .vid-play-btn.paused .vp-pause { opacity: 0; }
 
+    /* ---- Mobile autoplay button — base styles (all screen sizes) ---- */
+    .mob-autoplay-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 110;
+      height: 44px;
+      padding: 0 20px;
+      border-radius: 50px;
+      background: linear-gradient(135deg, rgba(18,14,8,0.88) 0%, rgba(10,8,4,0.85) 100%);
+      border: 1px solid rgba(200,175,120,0.50);
+      box-shadow: 0 4px 28px rgba(0,0,0,0.65), inset 0 1px 0 rgba(200,175,120,0.14);
+      color: rgba(200,175,120,0.95);
+      font-family: 'Jost', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+      backdrop-filter: blur(22px) saturate(1.5);
+      -webkit-backdrop-filter: blur(22px) saturate(1.5);
+      transition: border-color 0.25s, box-shadow 0.25s, bottom 0.35s cubic-bezier(0.4,0,0.2,1);
+      white-space: nowrap;
+      outline: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mob-autoplay-btn:hover,
+    .mob-autoplay-btn:active {
+      border-color: rgba(200,175,120,0.85);
+      box-shadow: 0 6px 30px rgba(0,0,0,0.65), 0 0 18px rgba(200,175,120,0.28), inset 0 1px 0 rgba(200,175,120,0.18);
+    }
+    .mob-autoplay-btn.playing {
+      border-color: rgba(200,175,120,0.70);
+    }
+    .mob-autoplay-btn .mab-icon-wrap {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(180,145,70,0.12);
+      border: 1px solid rgba(200,175,120,0.28);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      position: relative;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .mob-autoplay-btn:hover .mab-icon-wrap,
+    .mob-autoplay-btn:active .mab-icon-wrap {
+      background: rgba(180,145,70,0.22);
+      border-color: rgba(200,175,120,0.55);
+    }
+    .mob-autoplay-btn .mab-icon {
+      width: 11px;
+      height: 11px;
+      position: absolute;
+      transition: opacity 0.2s;
+      color: rgba(200,175,120,0.92);
+    }
+    .mob-autoplay-btn .mab-label {
+      transition: opacity 0.15s, width 0.15s;
+      flex-shrink: 0;
+    }
+    .mob-autoplay-btn .mab-pause        { opacity: 0; }
+    .mob-autoplay-btn .mab-label-pause  { opacity: 0; width: 0; overflow: hidden; }
+    .mob-autoplay-btn .mab-play         { opacity: 1; }
+    .mob-autoplay-btn .mab-label-play   { opacity: 1; }
+    .mob-autoplay-btn.playing .mab-play        { opacity: 0; }
+    .mob-autoplay-btn.playing .mab-label-play  { opacity: 0; width: 0; overflow: hidden; }
+    .mob-autoplay-btn.playing .mab-pause       { opacity: 1; }
+    .mob-autoplay-btn.playing .mab-label-pause { opacity: 1; width: auto; }
+
+
+
     /* ══════════════════════════════════════════════════════
        MOBILE LANDSCAPE
     ══════════════════════════════════════════════════════ */
