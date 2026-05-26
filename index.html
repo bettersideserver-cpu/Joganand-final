@@ -2,6 +2,34 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  <!-- iOS Safari: add to home screen = fullscreen app -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
+  <meta name="apple-mobile-web-app-title" content="Yoganad">
+
+  <!-- Android Chrome: fullscreen PWA -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#000000">
+
+  <!-- Force landscape + fullscreen via JS on open -->
+  <script>
+    // Request fullscreen automatically on first user interaction (required by browsers)
+    (function() {
+      function requestFS() {
+        var el = document.documentElement;
+        var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+        if (req) req.call(el).catch(function(){});
+        document.removeEventListener('touchstart', requestFS, { once: true });
+        document.removeEventListener('click', requestFS, { once: true });
+      }
+      document.addEventListener('touchstart', requestFS, { once: true });
+      document.addEventListener('click', requestFS, { once: true });
+    })();
+  </script>
+
   <title>Yoganad — Premium Property Visualization</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
