@@ -1711,7 +1711,18 @@
       }
 
 
-      .ui-toggle-btn { display: none !important; }
+      /* bottom-nav: hidden by default in landscape; hamburger reveals it */
+      .bottom-nav {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(100%);
+        transition: opacity 0.3s ease, transform 0.3s ease;
+      }
+      body.mob-controls-open .bottom-nav {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+      }
 
       .section-display {
         min-height: 38px;
@@ -6954,8 +6965,8 @@
       if (openNav) { openNav.classList.remove('open'); openNav = null; }
     }
     function showUI() {
-      if (searchContainer) searchContainer.classList.remove('ui-hidden');
-      // bottomNav controlled by hamburger in landscape
+      // searchContainer controlled by hamburger in landscape
+      if (!isMobileLandscape() && searchContainer) searchContainer.classList.remove('ui-hidden');
       uiVisible = true;
       resetHideTimer();
     }
@@ -6996,13 +7007,17 @@
         mobControlsOpen = true;
         document.body.classList.add('mob-controls-open');
         bottomNav.classList.remove('ui-hidden');
+        if (searchContainer) searchContainer.classList.remove('ui-hidden');
       }
       function closeMobControls() {
         mobControlsOpen = false;
         document.body.classList.remove('mob-controls-open');
         closeMobSubPill();
-        // Hide bottom navbar in landscape
-        if (isMobLandscape()) bottomNav.classList.add('ui-hidden');
+        // Hide bottom navbar + search in landscape
+        if (isMobLandscape()) {
+          bottomNav.classList.add('ui-hidden');
+          if (searchContainer) searchContainer.classList.add('ui-hidden');
+        }
       }
       function closeMobSubPill() {
         mobActiveMarker = null;
@@ -7019,12 +7034,16 @@
         if (pBar) pBar.classList.remove('visible');
       }
 
-      // Init: hide navbar in landscape (hamburger controls it)
+      // Init: hide navbar + search in landscape (hamburger controls it)
       if (isMobLandscape()) {
         bottomNav.classList.add('ui-hidden');
+        if (searchContainer) searchContainer.classList.add('ui-hidden');
       }
       window.addEventListener('resize', function() {
-        if (!isMobLandscape()) bottomNav.classList.remove('ui-hidden');
+        if (!isMobLandscape()) {
+          bottomNav.classList.remove('ui-hidden');
+          if (searchContainer) searchContainer.classList.remove('ui-hidden');
+        }
       });
 
       // Override uiToggleBtn for portrait (capture phase)
