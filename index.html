@@ -2,56 +2,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-
-  <!-- iOS Safari: add to home screen = fullscreen app -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
-  <meta name="apple-mobile-web-app-title" content="Yoganad">
-
-  <!-- Android Chrome: fullscreen PWA -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#000000">
-
-  <!-- Force landscape + fullscreen via JS on open -->
-  <script>
-    // Request fullscreen automatically on first user interaction (required by browsers)
-    (function() {
-      function requestFS() {
-        var el = document.documentElement;
-        var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
-        if (req) req.call(el).catch(function(){});
-        document.removeEventListener('touchstart', requestFS, { once: true });
-        document.removeEventListener('click', requestFS, { once: true });
-      }
-      document.addEventListener('touchstart', requestFS, { once: true });
-      document.addEventListener('click', requestFS, { once: true });
-
-      // iOS Safari toolbar hide trick:
-      // Make body taller than viewport, scroll down 1px, then lock scroll position
-      function hideSafariToolbar() {
-        document.body.style.height = (window.innerHeight + 1) + 'px';
-        window.scrollTo(0, 1);
-        setTimeout(function() {
-          document.body.style.height = window.innerHeight + 'px';
-          window.scrollTo(0, 0);
-        }, 50);
-      }
-
-      // Run on load and on every resize/orientation change
-      window.addEventListener('load', function() {
-        setTimeout(hideSafariToolbar, 300);
-      });
-      window.addEventListener('orientationchange', function() {
-        setTimeout(hideSafariToolbar, 400);
-      });
-      window.addEventListener('resize', function() {
-        setTimeout(hideSafariToolbar, 200);
-      });
-    })();
-  </script>
-
   <title>Yoganad — Premium Property Visualization</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
@@ -92,19 +42,11 @@
     body {
       width: 100%;
       height: 100%;
-      /* Use dvh (dynamic viewport height) so Safari toolbar is excluded */
-      min-height: 100dvh;
       font-family: 'Jost', sans-serif;
       font-weight: 300;
       overflow: hidden;
       background: #0a0907;
       color: rgba(235,225,200,0.95);
-      /* Prevent scroll bounce that reveals toolbar */
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
     }
 
     /* ══════════════════════════════════════════════════════
