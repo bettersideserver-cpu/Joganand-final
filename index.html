@@ -7614,7 +7614,27 @@
         _scrubWasPlaying = false;
         window._bgVideoPinnedAtEnd = true; // prevent ended handler from resetting to 0
 
-     if (bgVideo.readyState >= 1) {
+     var doSeekToEnd = function() {
+  if (!bgVideo.duration || isNaN(bgVideo.duration) || bgVideo.duration <= 0) return;
+
+  var targetTime = Math.max(0, bgVideo.duration - 0.15);
+
+  var wasPlaying = !bgVideo.paused;
+
+  try {
+    bgVideo.currentTime = targetTime;
+  } catch(e) {
+    return;
+  }
+
+  bgVideo.addEventListener('seeked', function _done() {
+    bgVideo.removeEventListener('seeked', _done);
+
+    if (wasPlaying) {
+      bgVideo.pause();
+    }
+  }, { once: true });
+};
 
             // Attempt 1: immediate (fastSeek or already buffered)
             _tryFast();
@@ -7652,7 +7672,7 @@
             doSeekToEnd();
           });
         }
-      }
+      
 
       // Fire callback immediately - SVG pops instantly
       if (onComplete) onComplete();
