@@ -7228,11 +7228,11 @@
     function syncSvgOverlay() {
       const overlay = document.getElementById('svgOverlay');
       if (!overlay) return;
-      // Always fill the full viewport — inner SVGs use preserveAspectRatio="xMidYMid slice"
-      // which matches object-fit:cover on the video, on every screen size / orientation.
-      overlay.style.width = '100vw';
-      overlay.style.height = '100vh';
-      overlay.style.transform = 'translate(0px, 0px)';
+      // Mirror the video element's exact rendered rect so SVG overlay sits pixel-perfect on top
+      const rect = bgVideo.getBoundingClientRect();
+      overlay.style.width  = rect.width  + 'px';
+      overlay.style.height = rect.height + 'px';
+      overlay.style.transform = 'translate(' + rect.left + 'px, ' + rect.top + 'px)';
     }
     syncSvgOverlay();
     window.addEventListener('resize', syncSvgOverlay);
