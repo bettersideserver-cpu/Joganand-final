@@ -841,6 +841,8 @@
     }
     function closePanel() {
       sidePanel.classList.remove('open');
+    }
+    function clearTapped() {
       if (lastTappedPlot) {
         lastTappedPlot.classList.remove('tapped');
         lastTappedPlot = null;
@@ -853,11 +855,11 @@
     }
 
     /* ── Close button ── */
-    if (panelClose) panelClose.addEventListener('click', closePanel);
+    if (panelClose) panelClose.addEventListener('click', () => { closePanel(); clearTapped(); });
 
     /* ── Tap on map background closes panel ── */
     mapWrapper.addEventListener('click', e => {
-      if (e.target === mapWrapper || e.target === svgMap) closePanel();
+      if (e.target === mapWrapper || e.target === svgMap) { closePanel(); clearTapped(); }
     });
 
     /* ── Back button ── */
@@ -989,13 +991,10 @@
         if (dx < 10 && dy < 10 && dt < 500) {
           e.preventDefault();
           e.stopPropagation();
-          if (lastTappedPlot && lastTappedPlot !== shape) {
-            lastTappedPlot.classList.remove('tapped');
-          }
+          // clear previous tapped plot
+          clearTapped();
           if (lastTappedPlot === shape) {
-            // same plot tapped again — toggle off
-            shape.classList.remove('tapped');
-            lastTappedPlot = null;
+            // same plot tapped again — already cleared, just close
             closePanel();
             tooltip.classList.remove('visible');
             return;
