@@ -5839,21 +5839,22 @@
       </button>
       <input type="range" class="env-range" id="envSlider" min="0" max="24" step="0.01" value="0">
     </div>
-    <!-- Mobile autoplay button (visible only on mobile, replaces slider) -->
-    <button class="mob-autoplay-btn" id="mobAutoplayBtn" type="button" aria-label="Play tour video" style="display:none;">
-      <span class="mab-icon-wrap">
-        <svg class="mab-icon mab-play" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-          <polygon points="5.5,3.5 16.5,10 5.5,16.5" />
-        </svg>
-        <svg class="mab-icon mab-pause" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-          <rect x="4" y="3" width="4" height="14" rx="1.2"/>
-          <rect x="12" y="3" width="4" height="14" rx="1.2"/>
-        </svg>
-      </span>
-      <span class="mab-label mab-label-play">Play Tour</span>
-      <span class="mab-label mab-label-pause">Pause</span>
-    </button>
   </div>
+
+  <!-- Mobile autoplay button — moved outside env-bar so fixed positioning works correctly (env-bar uses transform which breaks child fixed positioning) -->
+  <button class="mob-autoplay-btn" id="mobAutoplayBtn" type="button" aria-label="Play tour video" style="display:none;">
+    <span class="mab-icon-wrap">
+      <svg class="mab-icon mab-play" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="5.5,3.5 16.5,10 5.5,16.5" />
+      </svg>
+      <svg class="mab-icon mab-pause" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="3" width="4" height="14" rx="1.2"/>
+        <rect x="12" y="3" width="4" height="14" rx="1.2"/>
+      </svg>
+    </span>
+    <span class="mab-label mab-label-play">Play Tour</span>
+    <span class="mab-label mab-label-pause">Pause</span>
+  </button>
 
   
   <!-- COMING SOON / NOT AVAILABLE TOAST -->
