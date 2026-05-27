@@ -7227,15 +7227,27 @@
     function syncSvgOverlay() {
       const overlay = document.getElementById('svgOverlay');
       if (!overlay) return;
-      // Mirror the video element's exact rendered rect
       const rect = bgVideo.getBoundingClientRect();
-      const w = rect.width  + 'px';
-      const h = rect.height + 'px';
-      const tx = 'translate(' + rect.left + 'px, ' + rect.top + 'px)';
+      const cw = rect.width;
+      const ch = rect.height;
+      // Use intrinsic video dimensions if available, else fall back to 1920x1080
+      const vw = bgVideo.videoWidth  || 1920;
+      const vh = bgVideo.videoHeight || 1080;
+      // Compute object-fit:cover rendered content area
+      const scale = Math.max(cw / vw, ch / vh);
+      const dw = vw * scale;
+      const dh = vh * scale;
+      const dx = (cw - dw) / 2;
+      const dy = (ch - dh) / 2;
+      const left = rect.left + dx;
+      const top  = rect.top  + dy;
+      const w = dw + 'px';
+      const h = dh + 'px';
+      const tx = 'translate(' + left + 'px, ' + top + 'px)';
       overlay.style.width     = w;
       overlay.style.height    = h;
       overlay.style.transform = tx;
-      // Keep overlay.webp the same size as the video
+      // Keep overlay.webp the same rect
       var img = document.getElementById('optionOverlayImg');
       if (img) {
         img.style.width     = w;
@@ -7245,6 +7257,9 @@
     }
     syncSvgOverlay();
     window.addEventListener('resize', syncSvgOverlay);
+    // Re-sync once video dimensions are known
+    bgVideo.addEventListener('loadedmetadata', syncSvgOverlay);
+    bgVideo.addEventListener('resize', syncSvgOverlay);
 
     // ── Video loading ──────────────────────────────────────────────────────────
     let _bgVideoStarted = false;
