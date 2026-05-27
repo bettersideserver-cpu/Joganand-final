@@ -1315,16 +1315,16 @@
     }
 
 .svg-overlay {
-  /* Removed inset: 0; so it doesn't auto-stretch */
   position: fixed;
   top: 0;
   left: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
   pointer-events: none;
   z-index: 15;
   opacity: 0;
   transition: opacity 0.45s ease;
-  
-  /* Force a hardware-accelerated transform origin */
   transform-origin: top left;
 }
     .svg-overlay.at-endpoint .zone-svg {
@@ -3508,7 +3508,7 @@
 
     <!-- 8. GARDEN -->
     <svg class="zone-svg" data-zone-svg="garden" viewBox="0 0 360 360" fill="none" xmlns="http://www.w3.org/2000/svg"
-      style="display:none">
+      style="display:none" preserveAspectRatio="xMidYMid slice">
       <defs>
         <linearGradient id="goldStroke3" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="oklch(88% 0.10 80)" stop-opacity="1" />
@@ -7228,19 +7228,11 @@
     function syncSvgOverlay() {
       const overlay = document.getElementById('svgOverlay');
       if (!overlay) return;
-      const NATIVE_W = 1920;
-      const NATIVE_H = 1080;
-      const rect = bgVideo.getBoundingClientRect();
-      const cw = rect.width;
-      const ch = rect.height;
-      const scale = Math.max(cw / NATIVE_W, ch / NATIVE_H);
-      const dw = NATIVE_W * scale;
-      const dh = NATIVE_H * scale;
-      const dx = (cw - dw) / 2;
-      const dy = (ch - dh) / 2;
-      overlay.style.width = dw + 'px';
-      overlay.style.height = dh + 'px';
-      overlay.style.transform = 'translate(' + (rect.left + dx) + 'px, ' + (rect.top + dy) + 'px)';
+      // Always fill the full viewport — inner SVGs use preserveAspectRatio="xMidYMid slice"
+      // which matches object-fit:cover on the video, on every screen size / orientation.
+      overlay.style.width = '100vw';
+      overlay.style.height = '100vh';
+      overlay.style.transform = 'translate(0px, 0px)';
     }
     syncSvgOverlay();
     window.addEventListener('resize', syncSvgOverlay);
