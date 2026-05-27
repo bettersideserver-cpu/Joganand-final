@@ -1139,6 +1139,14 @@
           if (lastTappedPlot && lastTappedPlot !== shape) {
             lastTappedPlot.classList.remove('tapped');
           }
+          if (lastTappedPlot === shape) {
+            // same plot tapped again — toggle off
+            shape.classList.remove('tapped');
+            lastTappedPlot = null;
+            closePanel();
+            tooltip.classList.remove('visible');
+            return;
+          }
           shape.classList.add('tapped');
           lastTappedPlot = shape;
           openPanel(plotId, e.changedTouches[0].clientX);
