@@ -7273,9 +7273,25 @@
         ready = true;
         bgVideo.classList.add('ready');
         if (statusEl) statusEl.classList.remove('show');
+        var _isIOS_bn = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
         var _doLastFrame = function() {
-          bgVideo.pause();
-          bgVideo.currentTime = bgVideo.duration - 0.001;
+          var _t = bgVideo.duration - 0.001;
+          if (_isIOS_bn) {
+            // iOS: play briefly to unlock seeking, then seek to end
+            var _done = false;
+            var _fb = setTimeout(function(){ if(!_done){_done=true;bgVideo.pause();} }, 1500);
+            var _tu = function() {
+              if (_done) return;
+              bgVideo.removeEventListener('timeupdate', _tu);
+              bgVideo.currentTime = _t;
+              bgVideo.addEventListener('seeked', function _s(){ bgVideo.removeEventListener('seeked',_s); clearTimeout(_fb); if(!_done){_done=true;bgVideo.pause();} }, {once:true});
+            };
+            bgVideo.addEventListener('timeupdate', _tu);
+            bgVideo.play().catch(function(){ bgVideo.removeEventListener('timeupdate',_tu); clearTimeout(_fb); bgVideo.currentTime=_t; setTimeout(function(){bgVideo.pause();},400); });
+          } else {
+            bgVideo.pause();
+            bgVideo.currentTime = _t;
+          }
           slider.value = parseFloat(slider.max);
           refreshSliderVisual();
           targetFloat = parseFloat(slider.max);
@@ -7597,16 +7613,49 @@
         var doSeekToEnd = function() {
           if (!bgVideo.duration || isNaN(bgVideo.duration) || bgVideo.duration <= 0) return;
           var targetTime = bgVideo.duration - 0.001;
-          // Pause first, then seek — prevents video playing through to 'ended' on mobile
-          bgVideo.pause();
-          // Fallback: force pause after 800ms in case seeked never fires
-          var _seekFallback = setTimeout(function() { bgVideo.pause(); }, 800);
-          bgVideo.addEventListener('seeked', function _onSeeked() {
-            bgVideo.removeEventListener('seeked', _onSeeked);
-            clearTimeout(_seekFallback);
+          var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+          if (isIOS) {
+            // iOS Safari requires a play() call before seeking works reliably.
+            // Strategy: play briefly, then seek to end in timeupdate, then pause.
+            var _iosSeeked = false;
+            var _iosSeekFallback = setTimeout(function() {
+              if (!_iosSeeked) { _iosSeeked = true; bgVideo.pause(); }
+            }, 1500);
+            var _onTimeUpdate = function() {
+              if (_iosSeeked) return;
+              bgVideo.removeEventListener('timeupdate', _onTimeUpdate);
+              bgVideo.currentTime = targetTime;
+              bgVideo.addEventListener('seeked', function _onIosSeeked() {
+                bgVideo.removeEventListener('seeked', _onIosSeeked);
+                clearTimeout(_iosSeekFallback);
+                if (!_iosSeeked) { _iosSeeked = true; bgVideo.pause(); }
+              }, { once: true });
+            };
+            bgVideo.addEventListener('timeupdate', _onTimeUpdate);
+            bgVideo.play().catch(function() {
+              // Autoplay blocked — fallback: direct seek
+              bgVideo.removeEventListener('timeupdate', _onTimeUpdate);
+              clearTimeout(_iosSeekFallback);
+              bgVideo.currentTime = targetTime;
+              var _seekFallback2 = setTimeout(function() { bgVideo.pause(); }, 800);
+              bgVideo.addEventListener('seeked', function _onFallback() {
+                bgVideo.removeEventListener('seeked', _onFallback);
+                clearTimeout(_seekFallback2);
+                bgVideo.pause();
+              }, { once: true });
+            });
+          } else {
+            // Non-iOS: pause first, then seek
             bgVideo.pause();
-          }, { once: true });
-          bgVideo.currentTime = targetTime;
+            var _seekFallback = setTimeout(function() { bgVideo.pause(); }, 800);
+            bgVideo.addEventListener('seeked', function _onSeeked() {
+              bgVideo.removeEventListener('seeked', _onSeeked);
+              clearTimeout(_seekFallback);
+              bgVideo.pause();
+            }, { once: true });
+            bgVideo.currentTime = targetTime;
+          }
         };
 
         if (bgVideo.readyState >= 1) {
