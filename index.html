@@ -1553,9 +1553,10 @@
       justify-content: center;
       gap: 9px;
       position: fixed;
-      bottom: 80px;
-      left: 50%;
-      transform: translateX(-50%);
+      top: 12px;
+      left: 12px;
+      bottom: auto;
+      transform: none;
       z-index: 110;
       height: 44px;
       padding: 0 20px;
@@ -7616,34 +7617,50 @@
           var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
           if (isIOS) {
-            // iOS Safari requires a play() call before seeking works reliably.
-            // Strategy: play briefly, then seek to end in timeupdate, then pause.
-            var _iosSeeked = false;
-            var _iosSeekFallback = setTimeout(function() {
-              if (!_iosSeeked) { _iosSeeked = true; bgVideo.pause(); }
-            }, 1500);
-            var _onTimeUpdate = function() {
-              if (_iosSeeked) return;
-              bgVideo.removeEventListener('timeupdate', _onTimeUpdate);
-              bgVideo.currentTime = targetTime;
-              bgVideo.addEventListener('seeked', function _onIosSeeked() {
-                bgVideo.removeEventListener('seeked', _onIosSeeked);
-                clearTimeout(_iosSeekFallback);
-                if (!_iosSeeked) { _iosSeeked = true; bgVideo.pause(); }
-              }, { once: true });
+            // iOS Safari: currentTime only sticks if the target is buffered AND
+            // the video is playing. Strategy: play, poll buffered ranges until
+            // the end frame is available, then seek & pause.
+            var _iosDone = false;
+            var _bufferPollTimer = null;
+            var _hardTimeout = setTimeout(function() {
+              if (_iosDone) return;
+              _iosDone = true;
+              clearTimeout(_bufferPollTimer);
+              bgVideo.removeEventListener('timeupdate', _onFirstPlay);
+              bgVideo.pause();
+            }, 4000);
+            function _trySeekWhenBuffered() {
+              if (_iosDone) return;
+              var buf = bgVideo.buffered;
+              var ok = false;
+              for (var i = 0; i < buf.length; i++) {
+                if (buf.start(i) <= targetTime && buf.end(i) >= targetTime - 0.05) { ok = true; break; }
+              }
+              if (ok) {
+                _iosDone = true;
+                clearTimeout(_hardTimeout);
+                clearTimeout(_bufferPollTimer);
+                bgVideo.currentTime = targetTime;
+                bgVideo.addEventListener('seeked', function _onIosSeeked() {
+                  bgVideo.removeEventListener('seeked', _onIosSeeked);
+                  bgVideo.pause();
+                }, { once: true });
+                setTimeout(function() { if (!bgVideo.paused) bgVideo.pause(); }, 600);
+              } else {
+                _bufferPollTimer = setTimeout(_trySeekWhenBuffered, 150);
+              }
+            }
+            var _onFirstPlay = function() {
+              bgVideo.removeEventListener('timeupdate', _onFirstPlay);
+              _trySeekWhenBuffered();
             };
-            bgVideo.addEventListener('timeupdate', _onTimeUpdate);
+            bgVideo.addEventListener('timeupdate', _onFirstPlay);
             bgVideo.play().catch(function() {
-              // Autoplay blocked — fallback: direct seek
-              bgVideo.removeEventListener('timeupdate', _onTimeUpdate);
-              clearTimeout(_iosSeekFallback);
+              bgVideo.removeEventListener('timeupdate', _onFirstPlay);
+              clearTimeout(_hardTimeout);
+              _iosDone = true;
               bgVideo.currentTime = targetTime;
-              var _seekFallback2 = setTimeout(function() { bgVideo.pause(); }, 800);
-              bgVideo.addEventListener('seeked', function _onFallback() {
-                bgVideo.removeEventListener('seeked', _onFallback);
-                clearTimeout(_seekFallback2);
-                bgVideo.pause();
-              }, { once: true });
+              setTimeout(function() { if (!bgVideo.paused) bgVideo.pause(); }, 600);
             });
           } else {
             // Non-iOS: pause first, then seek
@@ -8659,6 +8676,15 @@ if (bgMusic) bgMusic.volume = 0.2;
         overlay.classList.remove('active', 'fade-out');
         overlayActive = false;
       }, 500);
+
+      // If the background video was never started (e.g. page refreshed while in
+      // portrait, then user rotates to landscape), start it now so the video
+      // gets its .ready class and becomes visible.
+      setTimeout(function() {
+        if (typeof startBgVideo === 'function' && typeof _bgVideoStarted !== 'undefined' && !_bgVideoStarted) {
+          startBgVideo();
+        }
+      }, 100);
 
       // Show explore button so user can start the experience
       // After intro is done, _showExplore is a no-op (introFinished guard)
