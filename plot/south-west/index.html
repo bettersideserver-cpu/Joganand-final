@@ -103,7 +103,7 @@
       filter: drop-shadow(0 0 12px rgba(200, 175, 120, 0.30));
     }
     .plot-shape.tapped {
-      fill: rgba(200, 175, 120, 0.18);
+      fill: rgba(255, 208, 113, 0.879);
       stroke: oklch(82% 0.13 78);
       stroke-width: 2.2;
       filter: drop-shadow(0 0 12px rgba(200, 175, 120, 0.30));
@@ -607,6 +607,10 @@
     }
     function closePanel() {
       sidePanel.classList.remove('open');
+      if (lastTappedPlot) {
+        lastTappedPlot.classList.remove('tapped');
+        lastTappedPlot = null;
+      }
     }
 
     /* ── Hint dismiss ── */
