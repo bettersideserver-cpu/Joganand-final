@@ -7616,52 +7616,50 @@
 
         var doSeekToEnd = function() {
           if (!bgVideo.duration || isNaN(bgVideo.duration) || bgVideo.duration <= 0) return;
- var targetTime = Math.max(0, bgVideo.duration - 0.05);
+          var targetTime = Math.max(0, bgVideo.duration - 0.05);
 
-var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+          var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-   if (isSafari) {
-            // iOS Safari: use fastSeek() first (ignores buffer, jumps to nearest keyframe).
-            // Fall back to buffered-range check, then hard 5s timeout.
+          if (isIOS) {
+            // iOS Safari: must play() first to unlock the decoder so seeking works.
+            // Direct currentTime assignment on a stalled/unplayed iOS video is silently ignored.
             var _done = false;
+            var _hardT = null;
 
-            function _finish(t) {
+            function _finishSeek() {
               if (_done) return; _done = true;
-              bgVideo.removeEventListener('timeupdate', _tryFast);
+              bgVideo.removeEventListener('timeupdate', _onTU);
               clearTimeout(_hardT);
-              if (bgVideo.fastSeek) { bgVideo.fastSeek(t); }
-              else { bgVideo.currentTime = t; }
+              bgVideo.pause();
+            }
+
+            function _onTU() {
+              if (_done) return;
+              bgVideo.removeEventListener('timeupdate', _onTU);
+              bgVideo.currentTime = targetTime;
+              bgVideo.addEventListener('seeked', function _s() {
+                bgVideo.removeEventListener('seeked', _s);
+                _finishSeek();
+              }, { once: true });
+              // Safety: pause if seeked never fires
+              _hardT = setTimeout(_finishSeek, 1500);
+            }
+
+            bgVideo.play().then(function() {
+              bgVideo.addEventListener('timeupdate', _onTU);
+            }).catch(function() {
+              // Autoplay blocked — try direct seek anyway
+              bgVideo.currentTime = targetTime;
               bgVideo.addEventListener('seeked', function _s() {
                 bgVideo.removeEventListener('seeked', _s);
                 bgVideo.pause();
               }, { once: true });
-              setTimeout(function() { if (!bgVideo.paused) bgVideo.pause(); }, 800);
-            }
+              setTimeout(function() { if (!bgVideo.paused) bgVideo.pause(); }, 1500);
+            });
 
-            function _tryFast() {
-              if (_done) return;
-              if (bgVideo.fastSeek) { _finish(targetTime); return; }
-              var buf = bgVideo.buffered;
-              for (var i = 0; i < buf.length; i++) {
-                if (buf.end(i) >= targetTime - 0.1) { _finish(targetTime); return; }
-              }
-            }
+            // Absolute fallback: 6s
+            setTimeout(function() { if (!bgVideo.paused) bgVideo.pause(); }, 6000);
 
-            // Attempt 1: immediate (fastSeek or already buffered)
-            _tryFast();
-
-            if (!_done) {
-              // Attempt 2: play to force buffering, seek on timeupdate
-              bgVideo.addEventListener('timeupdate', _tryFast);
-              bgVideo.play().catch(function() {});
-
-              // Attempt 3: hard 5s timeout - seek to best available
-              var _hardT = setTimeout(function() {
-                var buf = bgVideo.buffered, best = targetTime;
-                if (buf.length > 0) best = Math.min(buf.end(buf.length - 1) - 0.001, targetTime);
-                _finish(best);
-              }, 5000);
-            }
           } else {
             // Non-iOS: pause first, then seek
             bgVideo.pause();
