@@ -7614,27 +7614,38 @@
         _scrubWasPlaying = false;
         window._bgVideoPinnedAtEnd = true; // prevent ended handler from resetting to 0
 
-     var doSeekToEnd = function() {
-  if (!bgVideo.duration || isNaN(bgVideo.duration) || bgVideo.duration <= 0) return;
+        var doSeekToEnd = function() {
+          if (!bgVideo.duration || isNaN(bgVideo.duration) || bgVideo.duration <= 0) return;
+ var targetTime = Math.max(0, bgVideo.duration - 0.05);
 
-  var targetTime = Math.max(0, bgVideo.duration - 0.15);
+var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-  var wasPlaying = !bgVideo.paused;
+   if (isSafari) {
+            // iOS Safari: use fastSeek() first (ignores buffer, jumps to nearest keyframe).
+            // Fall back to buffered-range check, then hard 5s timeout.
+            var _done = false;
 
-  try {
-    bgVideo.currentTime = targetTime;
-  } catch(e) {
-    return;
-  }
+            function _finish(t) {
+              if (_done) return; _done = true;
+              bgVideo.removeEventListener('timeupdate', _tryFast);
+              clearTimeout(_hardT);
+              if (bgVideo.fastSeek) { bgVideo.fastSeek(t); }
+              else { bgVideo.currentTime = t; }
+              bgVideo.addEventListener('seeked', function _s() {
+                bgVideo.removeEventListener('seeked', _s);
+                bgVideo.pause();
+              }, { once: true });
+              setTimeout(function() { if (!bgVideo.paused) bgVideo.pause(); }, 800);
+            }
 
-  bgVideo.addEventListener('seeked', function _done() {
-    bgVideo.removeEventListener('seeked', _done);
-
-    if (wasPlaying) {
-      bgVideo.pause();
-    }
-  }, { once: true });
-};
+            function _tryFast() {
+              if (_done) return;
+              if (bgVideo.fastSeek) { _finish(targetTime); return; }
+              var buf = bgVideo.buffered;
+              for (var i = 0; i < buf.length; i++) {
+                if (buf.end(i) >= targetTime - 0.1) { _finish(targetTime); return; }
+              }
+            }
 
             // Attempt 1: immediate (fastSeek or already buffered)
             _tryFast();
@@ -7672,11 +7683,11 @@
             doSeekToEnd();
           });
         }
-      
+      }
 
       // Fire callback immediately - SVG pops instantly
       if (onComplete) onComplete();
-    
+    }
 
 
     // ══════════════════════════════════════════════════════
