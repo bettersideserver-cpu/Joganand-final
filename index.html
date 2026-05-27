@@ -140,9 +140,8 @@
        ══════════════════════════════════════════════════════ */
     .option-overlay-img {
       position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
+      top: 0;
+      left: 0;
       object-fit: cover;
       z-index: 10; /* above video (z:1), below svg-overlay (z:15) */
       pointer-events: none;
@@ -7228,11 +7227,21 @@
     function syncSvgOverlay() {
       const overlay = document.getElementById('svgOverlay');
       if (!overlay) return;
-      // Mirror the video element's exact rendered rect so SVG overlay sits pixel-perfect on top
+      // Mirror the video element's exact rendered rect
       const rect = bgVideo.getBoundingClientRect();
-      overlay.style.width  = rect.width  + 'px';
-      overlay.style.height = rect.height + 'px';
-      overlay.style.transform = 'translate(' + rect.left + 'px, ' + rect.top + 'px)';
+      const w = rect.width  + 'px';
+      const h = rect.height + 'px';
+      const tx = 'translate(' + rect.left + 'px, ' + rect.top + 'px)';
+      overlay.style.width     = w;
+      overlay.style.height    = h;
+      overlay.style.transform = tx;
+      // Keep overlay.webp the same size as the video
+      var img = document.getElementById('optionOverlayImg');
+      if (img) {
+        img.style.width     = w;
+        img.style.height    = h;
+        img.style.transform = tx;
+      }
     }
     syncSvgOverlay();
     window.addEventListener('resize', syncSvgOverlay);
