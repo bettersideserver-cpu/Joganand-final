@@ -7616,10 +7616,11 @@
 
         var doSeekToEnd = function() {
           if (!bgVideo.duration || isNaN(bgVideo.duration) || bgVideo.duration <= 0) return;
-          var targetTime = bgVideo.duration - 0.001;
-          var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+ var targetTime = Math.max(0, bgVideo.duration - 0.05);
 
-          if (isIOS) {
+var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+   if (isSafari) {
             // iOS Safari: use fastSeek() first (ignores buffer, jumps to nearest keyframe).
             // Fall back to buffered-range check, then hard 5s timeout.
             var _done = false;
