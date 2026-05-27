@@ -134,6 +134,25 @@
     .bg-video.ready {
       opacity: 1;
     }
+
+    /* ══════════════════════════════════════════════════════
+       OPTION OVERLAY IMAGE
+       ══════════════════════════════════════════════════════ */
+    .option-overlay-img {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 10; /* above video (z:1), below svg-overlay (z:15) */
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    .option-overlay-img.visible {
+      opacity: 1;
+    }
+
     /* Mobile scrub video hidden by default, shown via .ready class */
     .mobile-bg-video { opacity: 0 !important; }
     .mobile-bg-video.ready { opacity: 1 !important; }
@@ -3375,6 +3394,8 @@
     </div>
     <div class="pic-cta">Click to View Details →</div>
   </div>
+
+  <img class="option-overlay-img" id="optionOverlayImg" src="overlay.webp" alt="" />
 
   <div class="svg-overlay" id="svgOverlay">
 
@@ -7492,7 +7513,7 @@
     // SVG visible only when (a) a sub-pill or search/direction is active AND (b) slider is near last frame
     function checkAndShowSvg() {
       const sliderPct = parseFloat(slider.value) / parseFloat(slider.max);
-      const nearEnd = sliderPct > 0.97;
+      const nearEnd = sliderPct > 0.97 || svgOverlay.classList.contains('at-endpoint');
 
       let showSomething = false;
 
@@ -7591,6 +7612,64 @@
    // ══════════════════════════════════════════════════════
     // ANIMATE SLIDER TO A TARGET PERCENTAGE (Updated for Mobile Sync)
     // ══════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════
+    // OPTION OVERLAY IMAGE — show on marker/pill click, dismiss on play
+    // ══════════════════════════════════════════════════════
+    const _optionOverlayImg = document.getElementById('optionOverlayImg');
+
+    function showOptionOverlay() {
+      // Pause video and freeze it
+      if (bgVideo && !bgVideo.paused) bgVideo.pause();
+      window._bgVideoPinnedAtEnd = true;
+
+      // Show overlay image
+      if (_optionOverlayImg) _optionOverlayImg.classList.add('visible');
+
+      // Ensure pill bars match active marker
+      if (activeMarker === 'amenities') {
+        amenitiesBar.classList.add('visible');
+        plotBar.classList.remove('visible');
+      } else if (activeMarker === 'plots') {
+        plotBar.classList.add('visible');
+        amenitiesBar.classList.remove('visible');
+      }
+
+      // Show SVGs (checkAndShowSvg needs at-endpoint set)
+      svgOverlay.classList.add('at-endpoint');
+      checkAndShowSvg();
+      updateSectionDisplay();
+    }
+
+    function hideOptionOverlay() {
+      if (_optionOverlayImg) _optionOverlayImg.classList.remove('visible');
+      // Remove SVGs
+      svgOverlay.classList.remove('visible', 'at-endpoint');
+      hideAllSvgs();
+      // Unpin video so play works normally
+      window._bgVideoPinnedAtEnd = false;
+    }
+
+    // Wire existing play buttons to dismiss the overlay
+    function _setupOverlayDismiss() {
+      // Desktop vid-play-btn
+      var _vp = document.getElementById('vidPlayBtn');
+      if (_vp) {
+        _vp.addEventListener('click', function() {
+          if (_optionOverlayImg && _optionOverlayImg.classList.contains('visible')) {
+            hideOptionOverlay();
+          }
+        }, true); // capture so it fires first
+      }
+      // Mobile mob-autoplay-btn — delegated because it's set up later
+      document.addEventListener('click', function(e) {
+        if (!e.target.closest('#mobAutoplayBtn')) return;
+        if (_optionOverlayImg && _optionOverlayImg.classList.contains('visible')) {
+          hideOptionOverlay();
+        }
+      }, true);
+    }
+    _setupOverlayDismiss();
+
    function animateSliderTo(targetPct, onComplete, duration) {
       // INSTANT snap to target - no animation
       if (typeof zoneSnapAnim !== 'undefined' && zoneSnapAnim) {
@@ -7724,12 +7803,9 @@
         amenitiesBar.classList.remove('visible');
       }
 
-      // Animate slider to the LAST frame regardless of which marker
-      animateSliderTo(1.0, () => {
-        checkAndShowSvg();
-        updateSectionDisplay();
-        startMarkerHintTimer();
-      });
+      // Show overlay image immediately, pause video, show SVG
+      showOptionOverlay();
+      startMarkerHintTimer();
 
       updateSectionDisplay();
     });
@@ -7748,7 +7824,7 @@
         activeSubPill = null;
         activeSubPillType = null;
         pill.classList.remove('active');
-        checkAndShowSvg();
+        hideOptionOverlay();
         updateSectionDisplay();
       } else {
         document.querySelectorAll('.plot-pill').forEach(p => p.classList.remove('active'));
@@ -7757,11 +7833,8 @@
         activeSubPillType = 'amenity';
         activeCategoryKey = null;
         activeCategoryLink = null;
-        animateSliderTo(1.0, () => {
-          checkAndShowSvg();
-          updateSectionDisplay();
-          startSubPillHintTimer();
-        });
+        showOptionOverlay();
+        startSubPillHintTimer();
         updateSectionDisplay();
       }
     });
@@ -7779,7 +7852,7 @@
         activeSubPill = null;
         activeSubPillType = null;
         pill.classList.remove('active');
-        checkAndShowSvg();
+        hideOptionOverlay();
         updateSectionDisplay();
       } else {
         document.querySelectorAll('.plot-pill').forEach(p => p.classList.remove('active'));
@@ -7790,11 +7863,8 @@
         activeCategoryLink = null;
         activePlotNumber = null;
         activeDirection = null;
-        animateSliderTo(1.0, () => {
-          checkAndShowSvg();
-          updateSectionDisplay();
-          startSubPillHintTimer();
-        });
+        showOptionOverlay();
+        startSubPillHintTimer();
         updateSectionDisplay();
       }
     });
@@ -7873,10 +7943,7 @@
         plotBar.classList.remove('visible');
         amenitiesBar.classList.remove('visible');
 
-        animateSliderTo(1.0, () => {
-          checkAndShowSvg();
-          updateSectionDisplay();
-        }, 100);
+        showOptionOverlay();
       });
     });
 
@@ -8290,12 +8357,10 @@ if (isMobileEngine) {
           t.classList.toggle('active', t.dataset.marker === 'plots');
         });
 
-        // Animate slider to last frame
-        animateSliderTo(1.0, () => {
-          checkAndShowSvg();
-          // Pin tooltip on searched plot
-          pinTooltipOnPlot(num);
-        }, 100);
+        // Show overlay for plot search
+        showOptionOverlay();
+        // Pin tooltip on searched plot
+        pinTooltipOnPlot(num);
       }
 
       // Clear pinned tooltip when input is cleared
@@ -8384,10 +8449,8 @@ if (isMobileEngine) {
             t.classList.toggle('active', t.dataset.marker === 'plots');
           });
 
-          // Animate to last frame
-          animateSliderTo(1.0, () => {
-            checkAndShowSvg();
-          }, 100);
+          // Show overlay for direction filter
+          showOptionOverlay();
         });
       });
     })();
