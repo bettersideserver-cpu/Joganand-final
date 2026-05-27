@@ -1573,7 +1573,7 @@
       cursor: pointer;
       backdrop-filter: blur(22px) saturate(1.5);
       -webkit-backdrop-filter: blur(22px) saturate(1.5);
-      transition: border-color 0.25s, box-shadow 0.25s, bottom 0.35s cubic-bezier(0.4,0,0.2,1);
+      transition: border-color 0.25s, box-shadow 0.25s;
       white-space: nowrap;
       outline: none;
       -webkit-tap-highlight-color: transparent;
@@ -7226,9 +7226,11 @@
 
     // ── Video loading ──────────────────────────────────────────────────────────
     let _bgVideoStarted = false;
+    window._startBgVideo = null; // set below
     function startBgVideo() {
       if (_bgVideoStarted) return;
       _bgVideoStarted = true;
+      window._bgVideoStarted = true;
 
       var _isBackNav = _isRealBackNav;
       _isRealBackNav = false; // consume the flag
@@ -7424,6 +7426,7 @@
       bgVideo.play().catch(function(){});
     }
 
+    window._startBgVideo = startBgVideo; // expose for orientation IIFE (cross-scope)
     // NOTE: startBgVideo() is called by setupIntro() after intro video ends
 
     // Bar visibility: show bottom bars when slider near end
@@ -7617,51 +7620,54 @@
           var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
           if (isIOS) {
-            // iOS Safari: currentTime only sticks if the target is buffered AND
-            // the video is playing. Strategy: play, poll buffered ranges until
-            // the end frame is available, then seek & pause.
+            // iOS Safari: currentTime only works if the target is buffered.
+            // Step 1: try immediately (video may already be buffered from prior play).
+            // Step 2: play() to force buffering, re-seek on every timeupdate.
+            // Step 3: hard 5s timeout - seek to furthest available position.
             var _iosDone = false;
-            var _bufferPollTimer = null;
-            var _hardTimeout = setTimeout(function() {
+            var _iosHardTimer = null;
+
+            function _iosFinish(t) {
               if (_iosDone) return;
               _iosDone = true;
-              clearTimeout(_bufferPollTimer);
-              bgVideo.removeEventListener('timeupdate', _onFirstPlay);
-              bgVideo.pause();
-            }, 4000);
-            function _trySeekWhenBuffered() {
+              bgVideo.removeEventListener('timeupdate', _iosTrySeek);
+              clearTimeout(_iosHardTimer);
+              bgVideo.currentTime = t;
+              bgVideo.addEventListener('seeked', function _s() {
+                bgVideo.removeEventListener('seeked', _s);
+                bgVideo.pause();
+              }, { once: true });
+              setTimeout(function() { if (!bgVideo.paused) bgVideo.pause(); }, 800);
+            }
+
+            function _iosTrySeek() {
               if (_iosDone) return;
               var buf = bgVideo.buffered;
-              var ok = false;
               for (var i = 0; i < buf.length; i++) {
-                if (buf.start(i) <= targetTime && buf.end(i) >= targetTime - 0.05) { ok = true; break; }
-              }
-              if (ok) {
-                _iosDone = true;
-                clearTimeout(_hardTimeout);
-                clearTimeout(_bufferPollTimer);
-                bgVideo.currentTime = targetTime;
-                bgVideo.addEventListener('seeked', function _onIosSeeked() {
-                  bgVideo.removeEventListener('seeked', _onIosSeeked);
-                  bgVideo.pause();
-                }, { once: true });
-                setTimeout(function() { if (!bgVideo.paused) bgVideo.pause(); }, 600);
-              } else {
-                _bufferPollTimer = setTimeout(_trySeekWhenBuffered, 150);
+                if (buf.end(i) >= targetTime - 0.1) {
+                  _iosFinish(targetTime);
+                  return;
+                }
               }
             }
-            var _onFirstPlay = function() {
-              bgVideo.removeEventListener('timeupdate', _onFirstPlay);
-              _trySeekWhenBuffered();
-            };
-            bgVideo.addEventListener('timeupdate', _onFirstPlay);
-            bgVideo.play().catch(function() {
-              bgVideo.removeEventListener('timeupdate', _onFirstPlay);
-              clearTimeout(_hardTimeout);
-              _iosDone = true;
-              bgVideo.currentTime = targetTime;
-              setTimeout(function() { if (!bgVideo.paused) bgVideo.pause(); }, 600);
-            });
+
+            // Attempt 1: immediate (works if already buffered)
+            _iosTrySeek();
+
+            if (!_iosDone) {
+              // Attempt 2: play to force buffering, seek on timeupdate
+              bgVideo.addEventListener('timeupdate', _iosTrySeek);
+              bgVideo.play().catch(function() {});
+
+              // Attempt 3: hard 5s timeout - seek to best available
+              _iosHardTimer = setTimeout(function() {
+                if (_iosDone) return;
+                var buf = bgVideo.buffered;
+                var best = targetTime;
+                if (buf.length > 0) best = Math.min(buf.end(buf.length - 1) - 0.001, targetTime);
+                _iosFinish(best);
+              }, 5000);
+            }
           } else {
             // Non-iOS: pause first, then seek
             bgVideo.pause();
@@ -8681,8 +8687,8 @@ if (bgMusic) bgMusic.volume = 0.2;
       // portrait, then user rotates to landscape), start it now so the video
       // gets its .ready class and becomes visible.
       setTimeout(function() {
-        if (typeof startBgVideo === 'function' && typeof _bgVideoStarted !== 'undefined' && !_bgVideoStarted) {
-          startBgVideo();
+        if (typeof window._startBgVideo === 'function' && !window._bgVideoStarted) {
+          window._startBgVideo();
         }
       }, 100);
 
