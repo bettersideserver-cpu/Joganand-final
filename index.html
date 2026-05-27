@@ -7620,19 +7620,16 @@
           var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
           if (isIOS) {
-            // iOS Safari: currentTime only works if the target is buffered.
-            // Step 1: try immediately (video may already be buffered from prior play).
-            // Step 2: play() to force buffering, re-seek on every timeupdate.
-            // Step 3: hard 5s timeout - seek to furthest available position.
-            var _iosDone = false;
-            var _iosHardTimer = null;
+            // iOS Safari: use fastSeek() first (ignores buffer, jumps to nearest keyframe).
+            // Fall back to buffered-range check, then hard 5s timeout.
+            var _done = false;
 
-            function _iosFinish(t) {
-              if (_iosDone) return;
-              _iosDone = true;
-              bgVideo.removeEventListener('timeupdate', _iosTrySeek);
-              clearTimeout(_iosHardTimer);
-              bgVideo.currentTime = t;
+            function _finish(t) {
+              if (_done) return; _done = true;
+              bgVideo.removeEventListener('timeupdate', _tryFast);
+              clearTimeout(_hardT);
+              if (bgVideo.fastSeek) { bgVideo.fastSeek(t); }
+              else { bgVideo.currentTime = t; }
               bgVideo.addEventListener('seeked', function _s() {
                 bgVideo.removeEventListener('seeked', _s);
                 bgVideo.pause();
@@ -7640,32 +7637,28 @@
               setTimeout(function() { if (!bgVideo.paused) bgVideo.pause(); }, 800);
             }
 
-            function _iosTrySeek() {
-              if (_iosDone) return;
+            function _tryFast() {
+              if (_done) return;
+              if (bgVideo.fastSeek) { _finish(targetTime); return; }
               var buf = bgVideo.buffered;
               for (var i = 0; i < buf.length; i++) {
-                if (buf.end(i) >= targetTime - 0.1) {
-                  _iosFinish(targetTime);
-                  return;
-                }
+                if (buf.end(i) >= targetTime - 0.1) { _finish(targetTime); return; }
               }
             }
 
-            // Attempt 1: immediate (works if already buffered)
-            _iosTrySeek();
+            // Attempt 1: immediate (fastSeek or already buffered)
+            _tryFast();
 
-            if (!_iosDone) {
+            if (!_done) {
               // Attempt 2: play to force buffering, seek on timeupdate
-              bgVideo.addEventListener('timeupdate', _iosTrySeek);
+              bgVideo.addEventListener('timeupdate', _tryFast);
               bgVideo.play().catch(function() {});
 
               // Attempt 3: hard 5s timeout - seek to best available
-              _iosHardTimer = setTimeout(function() {
-                if (_iosDone) return;
-                var buf = bgVideo.buffered;
-                var best = targetTime;
+              var _hardT = setTimeout(function() {
+                var buf = bgVideo.buffered, best = targetTime;
                 if (buf.length > 0) best = Math.min(buf.end(buf.length - 1) - 0.001, targetTime);
-                _iosFinish(best);
+                _finish(best);
               }, 5000);
             }
           } else {
@@ -7918,6 +7911,11 @@
       var isMob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 1024;
       if (!isMob) return;
       mobAutoplayBtn.style.display = 'flex';
+      mobAutoplayBtn.style.top = '12px';
+      mobAutoplayBtn.style.left = '12px';
+      mobAutoplayBtn.style.bottom = 'auto';
+      mobAutoplayBtn.style.transform = 'none';
+      mobAutoplayBtn.style.position = 'fixed';
 
       function updateBtnLabel() {
         if (bgVideo.paused) {
@@ -8682,6 +8680,9 @@ if (bgMusic) bgMusic.volume = 0.2;
         overlay.classList.remove('active', 'fade-out');
         overlayActive = false;
       }, 500);
+
+      // Remove intro-active so the site is visible (handles landscape refresh case)
+      document.body.classList.remove('intro-active');
 
       // If the background video was never started (e.g. page refreshed while in
       // portrait, then user rotates to landscape), start it now so the video
